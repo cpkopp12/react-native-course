@@ -3,21 +3,20 @@ import UserModel from 'src/models/user';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import AuthVerificationTokenModel from 'src/models/verificationToken';
+import { sendErrorResponse } from 'src/utils/helper';
 
 export const createNewUser: RequestHandler = async (req, res) => {
   // read and check incoming data
   const { name, email, password } = req.body;
-  if (!name) return res.status(422).json({ message: 'Name is missing' });
-  if (!email) return res.status(422).json({ message: 'email is missing' });
+  if (!name) return sendErrorResponse(res, 'name is missing', 422);
+  if (!email) return sendErrorResponse(res, 'email is missing', 422);
   if (!password) {
-    return res.status(422).json({ message: 'password is missing' });
+    return sendErrorResponse(res, 'password is missing', 422);
   }
   // check if user exists, either create or send message
   const existingUser = await UserModel.findOne({ email });
   if (existingUser) {
-    return res
-      .status(401)
-      .json({ message: 'Unauthorized request, email in use' });
+    return sendErrorResponse(res, 'Unauthorized request, email in use', 401);
   }
   const newUser = await UserModel.create({ name, email, password });
   // create verification token + email
