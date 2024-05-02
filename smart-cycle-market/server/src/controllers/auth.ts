@@ -8,11 +8,7 @@ import { sendErrorResponse } from 'src/utils/helper';
 export const createNewUser: RequestHandler = async (req, res) => {
   // read and check incoming data
   const { name, email, password } = req.body;
-  if (!name) return sendErrorResponse(res, 'name is missing', 422);
-  if (!email) return sendErrorResponse(res, 'email is missing', 422);
-  if (!password) {
-    return sendErrorResponse(res, 'password is missing', 422);
-  }
+
   // check if user exists, either create or send message
   const existingUser = await UserModel.findOne({ email });
   if (existingUser) {
