@@ -38,3 +38,20 @@ export const createNewUser: RequestHandler = async (req, res) => {
 
   return res.json({ message: 'please check your inbox' });
 };
+
+export const verifyEmail: RequestHandler = async (req, res) => {
+  // read incoming id and token
+  const { id, token } = req.body;
+  // find user token, if not send 403
+  const authToken = await AuthVerificationTokenModel.findOne({ owner: id });
+  if (!authToken) return sendErrorResponse(res, 'Unauthorized request!', 403);
+  // verify token against hashed token in model
+  const isMatch = await authToken.compareToken(token);
+  if (!isMatch)
+    return sendErrorResponse(res, 'Unauthorized request, token invalid', 403);
+  // update UserModel and delete authToken from db
+  await UserModel.findByIdAndUpdate(id, { verified: true });
+  await AuthVerificationTokenModel.findByIdAndDelete(authToken._id);
+
+  res.json({ message: 'Thanks for joining us, your email is verified!' });
+};

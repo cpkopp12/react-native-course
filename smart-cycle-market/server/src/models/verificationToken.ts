@@ -40,7 +40,7 @@ schema.pre('save', async function (next) {
 });
 
 // compare hash token
-schema.methods.comparePassword = async function (token: string) {
+schema.methods.compareToken = async function (token: string) {
   return await compare(token, this.token);
 };
 
