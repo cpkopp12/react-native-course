@@ -7,6 +7,7 @@ import authRouter from 'routes/auth';
 // EXPRESS SERVER --------------------------------------
 const app = express();
 
+app.use(express.static('src/public'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

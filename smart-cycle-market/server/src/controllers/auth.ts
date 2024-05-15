@@ -6,6 +6,7 @@ import nodemailer from 'nodemailer';
 import AuthVerificationTokenModel from 'src/models/verificationToken';
 import { sendErrorResponse } from 'src/utils/helper';
 import jwt from 'jsonwebtoken';
+import mail from 'src/utils/mail';
 
 // CONTROLLER FUNCTIONS -----------------------------------------------
 export const createNewUser: RequestHandler = async (req, res) => {
@@ -21,23 +22,25 @@ export const createNewUser: RequestHandler = async (req, res) => {
   // create verification token + email
   const token = crypto.randomBytes(36).toString('hex');
   await AuthVerificationTokenModel.create({ owner: newUser._id, token });
-  const link = `http://localhost:8000/verify?id=${newUser._id}&token=${token}`;
+  const link = `http://localhost:8000/verify.html?id=${newUser._id}&token=${token}`;
 
   // nodemailer
-  const transport = nodemailer.createTransport({
-    host: 'sandbox.smtp.mailtrap.io',
-    port: 2525,
-    auth: {
-      user: '3aa047ef44a768',
-      pass: '5719fcc551ced6',
-    },
-  });
+  // const transport = nodemailer.createTransport({
+  //   host: 'sandbox.smtp.mailtrap.io',
+  //   port: 2525,
+  //   auth: {
+  //     user: '3aa047ef44a768',
+  //     pass: '5719fcc551ced6',
+  //   },
+  // });
 
-  await transport.sendMail({
-    from: 'verification@myapp.com',
-    to: newUser.email,
-    html: `<h1>Please click <a href='${link}'>this link</a> to verify your account</h1>`,
-  });
+  // await transport.sendMail({
+  //   from: 'verification@myapp.com',
+  //   to: newUser.email,
+  //   html: `<h1>Please click <a href='${link}'>this link</a> to verify your account</h1>`,
+  // });
+
+  await mail.sendVerification(newUser.email, link);
 
   return res.json({ message: 'please check your inbox' });
 };
@@ -103,4 +106,23 @@ export const sendProfile: RequestHandler = async (req, res) => {
   res.json({
     profile: req.user,
   });
+};
+
+export const generateVerificationLink: RequestHandler = async (req, res) => {
+  // read id from req.user
+  const { id } = req.user;
+  // gen new auth token
+  const token = crypto.randomBytes(36).toString('hex');
+  // mail link
+  const link = `http:localhost:8000/verify.html?id=${id}&token=${token}`;
+
+  // look for verification token for owner: id, delete
+  await AuthVerificationTokenModel.findOneAndDelete({ owner: id });
+
+  // create and store new token
+  await AuthVerificationTokenModel.create({ owner: id, token });
+
+  await mail.sendVerification(req.user.email, link);
+
+  res.json({ message: 'Please Check Your Inbox' });
 };
