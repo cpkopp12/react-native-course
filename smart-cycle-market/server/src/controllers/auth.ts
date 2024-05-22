@@ -126,3 +126,46 @@ export const generateVerificationLink: RequestHandler = async (req, res) => {
 
   res.json({ message: 'Please Check Your Inbox' });
 };
+
+export const grantAccessToken: RequestHandler = async (req, res) => {
+  // read refresh token req.body, if none send err response
+  const { refreshToken } = req.body;
+  if (!refreshToken)
+    return sendErrorResponse(
+      res,
+      'Unauthorized request, no refresh token.',
+      403
+    );
+
+  // read user from token, check id and token
+  const payload = jwt.verify(refreshToken, 'secret') as { id: string };
+  if (!payload.id) {
+    return sendErrorResponse(res, 'Unauthorized request.', 401);
+  }
+  const user = await UserModel.findOne({
+    _id: payload.id,
+    tokens: refreshToken,
+  });
+  // if user is compromised, remove all previous tokens, send err response
+  if (!user) {
+    await UserModel.findByIdAndUpdate(payload.id, { tokens: [] });
+    return sendErrorResponse(res, 'Unauthorized request', 403);
+  }
+  // generate new refresh and access tokens
+  const newAccessToken = jwt.sign({ id: user._id }, 'secret', {
+    expiresIn: '15m',
+  });
+  const newRefreshToken = jwt.sign({ id: user._id }, 'secret');
+  // remove old refresh token
+  const filteredtokens = user.tokens.filter((token) => token !== refreshToken);
+  user.tokens = filteredtokens;
+  user.tokens.push(newRefreshToken);
+  await user.save();
+
+  res.json({
+    tokens: {
+      refresh: newRefreshToken,
+      access: newAccessToken,
+    },
+  });
+};
