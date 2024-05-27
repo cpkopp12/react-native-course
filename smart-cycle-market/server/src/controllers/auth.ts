@@ -7,6 +7,9 @@ import AuthVerificationTokenModel from 'src/models/verificationToken';
 import { sendErrorResponse } from 'src/utils/helper';
 import jwt from 'jsonwebtoken';
 import mail from 'src/utils/mail';
+import PasswordResetTokenModel from 'src/models/passwordResetToken';
+
+const JWT_SECRET = process.env.JWT_SECRET!;
 
 // CONTROLLER FUNCTIONS -----------------------------------------------
 export const createNewUser: RequestHandler = async (req, res) => {
@@ -22,23 +25,7 @@ export const createNewUser: RequestHandler = async (req, res) => {
   // create verification token + email
   const token = crypto.randomBytes(36).toString('hex');
   await AuthVerificationTokenModel.create({ owner: newUser._id, token });
-  const link = `http://localhost:8000/verify.html?id=${newUser._id}&token=${token}`;
-
-  // nodemailer
-  // const transport = nodemailer.createTransport({
-  //   host: 'sandbox.smtp.mailtrap.io',
-  //   port: 2525,
-  //   auth: {
-  //     user: '3aa047ef44a768',
-  //     pass: '5719fcc551ced6',
-  //   },
-  // });
-
-  // await transport.sendMail({
-  //   from: 'verification@myapp.com',
-  //   to: newUser.email,
-  //   html: `<h1>Please click <a href='${link}'>this link</a> to verify your account</h1>`,
-  // });
+  const link = `${process.env.VERIFICATION_LINK}?id=${newUser._id}&token=${token}`;
 
   await mail.sendVerification(newUser.email, link);
 
@@ -77,10 +64,10 @@ export const signIn: RequestHandler = async (req, res) => {
 
   // generate access and refresh tokens
   const payload = { id: user._id };
-  const accessToken = jwt.sign(payload, 'secret', {
+  const accessToken = jwt.sign(payload, JWT_SECRET, {
     expiresIn: '15m',
   });
-  const refreshToken = jwt.sign(payload, 'secret');
+  const refreshToken = jwt.sign(payload, JWT_SECRET);
 
   // save tokens to db in userModel
   if (!user.tokens) user.tokens = [refreshToken];
@@ -114,7 +101,7 @@ export const generateVerificationLink: RequestHandler = async (req, res) => {
   // gen new auth token
   const token = crypto.randomBytes(36).toString('hex');
   // mail link
-  const link = `http:localhost:8000/verify.html?id=${id}&token=${token}`;
+  const link = `${process.env.VERIFICATION_LINK}?id=${id}&token=${token}`;
 
   // look for verification token for owner: id, delete
   await AuthVerificationTokenModel.findOneAndDelete({ owner: id });
@@ -138,7 +125,7 @@ export const grantAccessToken: RequestHandler = async (req, res) => {
     );
 
   // read user from token, check id and token
-  const payload = jwt.verify(refreshToken, 'secret') as { id: string };
+  const payload = jwt.verify(refreshToken, JWT_SECRET) as { id: string };
   if (!payload.id) {
     return sendErrorResponse(res, 'Unauthorized request.', 401);
   }
@@ -152,10 +139,10 @@ export const grantAccessToken: RequestHandler = async (req, res) => {
     return sendErrorResponse(res, 'Unauthorized request', 403);
   }
   // generate new refresh and access tokens
-  const newAccessToken = jwt.sign({ id: user._id }, 'secret', {
+  const newAccessToken = jwt.sign({ id: user._id }, JWT_SECRET, {
     expiresIn: '15m',
   });
-  const newRefreshToken = jwt.sign({ id: user._id }, 'secret');
+  const newRefreshToken = jwt.sign({ id: user._id }, JWT_SECRET);
   // remove old refresh token
   const filteredtokens = user.tokens.filter((token) => token !== refreshToken);
   user.tokens = filteredtokens;
@@ -168,4 +155,45 @@ export const grantAccessToken: RequestHandler = async (req, res) => {
       access: newAccessToken,
     },
   });
+};
+
+export const signOut: RequestHandler = async (req, res) => {
+  // remove refresh token, check unauthorized
+  const { refreshToken } = req.body;
+  const user = await UserModel.findOne({
+    _id: req.user.id,
+    tokens: refreshToken,
+  });
+  if (!user)
+    return sendErrorResponse(res, 'Unauthorized request, user not found.', 403);
+
+  const newTokens = user.tokens.filter((t) => t !== refreshToken);
+  user.tokens = newTokens;
+  await user.save();
+
+  res.send();
+};
+
+export const generateForgetPasswordLink: RequestHandler = async (req, res) => {
+  console.log(process.env);
+  // email from req.body
+  const { email } = req.body;
+  // find user, if not send 404
+  const user = await UserModel.findOne({ email });
+  if (!user) return sendErrorResponse(res, 'Account not found.', 404);
+  // Remove any existing password reset tokens
+  await PasswordResetTokenModel.findOneAndDelete({ owner: user._id });
+  // create new token
+  const token = crypto.randomBytes(36).toString('hex');
+  await PasswordResetTokenModel.create({ owner: user._id, token });
+  // send link to user email
+  const passwordResetLink = `${process.env.PASSWORD_RESET_LINK}?id=${user._id}&token=${token}`;
+  await mail.sendPasswordResetLink(user.email, passwordResetLink);
+
+  // send res
+  res.json({ message: 'Please check your email.' });
+};
+
+export const grantValid: RequestHandler = async (req, res) => {
+  res.json({ valid: true });
 };

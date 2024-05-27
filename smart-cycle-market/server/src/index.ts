@@ -1,4 +1,5 @@
 // IMPORTS ------------------------------
+import 'dotenv/config';
 import 'express-async-errors';
 import 'src/db';
 import express from 'express';
@@ -15,6 +16,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use('/auth', authRouter);
 
 app.use(function (err, req, res, next) {
+  // console.log(err);
   res.status(500).json({ message: err.message });
 } as express.ErrorRequestHandler);
 

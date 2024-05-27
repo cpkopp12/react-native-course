@@ -3,6 +3,7 @@ import { RequestHandler } from 'express';
 import { sendErrorResponse } from 'src/utils/helper';
 import jwt, { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 import UserModel from 'src/models/user';
+import PasswordResetTokenModel from 'src/models/passwordResetToken';
 
 // TS: customize req object ---------------------------------
 interface UserProfile {
@@ -57,4 +58,24 @@ export const isAuth: RequestHandler = async (req, res, next) => {
     }
     next(error);
   }
+};
+
+export const isValidPasswordResetToken: RequestHandler = async (
+  req,
+  res,
+  next
+) => {
+  // read id and token and find token, if not send error
+  const { id, token } = req.body;
+  const resetPasswordToken = await PasswordResetTokenModel.findOne({
+    owner: id,
+  });
+  if (!resetPasswordToken)
+    return sendErrorResponse(res, 'Unauthorized requeest, invalid token.', 403);
+  // compare token, if not send error
+  const match = await resetPasswordToken.compareToken(token);
+  if (!match)
+    return sendErrorResponse(res, 'Unauthorized requeest, invalid token.', 403);
+
+  next();
 };
