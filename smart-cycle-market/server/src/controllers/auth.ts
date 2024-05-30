@@ -175,7 +175,6 @@ export const signOut: RequestHandler = async (req, res) => {
 };
 
 export const generateForgetPasswordLink: RequestHandler = async (req, res) => {
-  console.log(process.env);
   // email from req.body
   const { email } = req.body;
   // find user, if not send 404
@@ -196,4 +195,28 @@ export const generateForgetPasswordLink: RequestHandler = async (req, res) => {
 
 export const grantValid: RequestHandler = async (req, res) => {
   res.json({ valid: true });
+};
+
+export const updatePassword: RequestHandler = async (req, res) => {
+  // read id and password, find user or send err
+  const { id, password } = req.body;
+  const user = await UserModel.findById({ _id: id });
+  if (!user) return sendErrorResponse(res, 'Unauthorized access.', 403);
+  // check if user is reseting to same password
+  const oldMatches = await user.comparePassword(password);
+  if (oldMatches)
+    return sendErrorResponse(
+      res,
+      'New password must be different than previous password.',
+      422
+    );
+  // set new password
+  user.password = password;
+  await user.save();
+  // remove password reset token
+  await PasswordResetTokenModel.findOneAndDelete({ owner: user._id });
+  // send update email
+  await mail.sendPasswordUpdateMessage(user.email);
+
+  res.json({ message: 'Password reset successful.' });
 };
