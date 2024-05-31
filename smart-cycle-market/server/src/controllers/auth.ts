@@ -220,3 +220,15 @@ export const updatePassword: RequestHandler = async (req, res) => {
 
   res.json({ message: 'Password reset successful.' });
 };
+
+export const updateProfile: RequestHandler = async (req, res) => {
+  // get name from req.body, check for error
+  const { name } = req.body;
+  if (typeof name !== 'string' || name.trim().length < 3) {
+    return sendErrorResponse(res, 'Invalid name.', 422);
+  }
+  // find user by req.body.id, change name
+  await UserModel.findByIdAndUpdate(req.user.id, { name });
+
+  res.json({ profile: { ...req.user, name } });
+};

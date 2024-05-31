@@ -21,6 +21,7 @@ declare global {
   }
 }
 
+const jwtSecret = process.env.JWT_SECRET!;
 // AUTH MIDDLEWARE FUNCTIONS ------------------------------
 // verify user tokens
 export const isAuth: RequestHandler = async (req, res, next) => {
@@ -33,7 +34,7 @@ export const isAuth: RequestHandler = async (req, res, next) => {
 
     // verify token, if no user send error response
     const token = authHeader.split('Bearer ')[1];
-    const payload = jwt.verify(token, 'secret') as { id: string };
+    const payload = jwt.verify(token, jwtSecret) as { id: string };
 
     const user = await UserModel.findById(payload.id);
     if (!user) return sendErrorResponse(res, 'Unauthorized request.', 403);
